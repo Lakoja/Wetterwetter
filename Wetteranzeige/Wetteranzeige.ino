@@ -13,8 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
- 
-#include <CRC32.h>
 
 #include "Wave29Display.h"
 Wave29Display display;
@@ -36,9 +34,10 @@ unsigned long systemStart = 0;
 
 unsigned long tempUpdateThreshold = 6000L;
 
-class SystemState {
+#include "CrcableData.h"
+
+class SystemState : public CrcableData {
 public:
-  uint32_t crc32;
   bool externalDataValid = false;
   float lastExternalTemperature = 0;
   float lastExternalHumidity = 0;
@@ -56,12 +55,12 @@ void setup()
   Serial.println("Setup");
   
   DisplayState displayState;
-  bool displayStateValid = readFromRtc(1, (uint32_t*)&displayState, sizeof(DisplayState));
+  bool displayStateValid = displayState.readFromRtc(1);
   if (displayStateValid)
     displayState.isInitialized = false; //TODO ?
     
   SystemState systemStateFromRtc;
-  bool systemStateValid = readFromRtc(0, (uint32_t*)&systemStateFromRtc, sizeof(SystemState));
+  bool systemStateValid = systemStateFromRtc.readFromRtc(0);
   if (!systemStateValid) {
     Serial.println("Did not get last system data ");
   } else {
@@ -240,12 +239,12 @@ void loop()
     Serial.println(sleepMillis);
 
     DisplayState *displayState = display.getState();
-    writeToRtc(1, (uint32_t*)displayState, sizeof(DisplayState));
+    displayState->writeToRtc(1);
 
 
     systemState.accumulatedSystemMillis = systemState.accumulatedSystemMillis + systemActive + sleepMillis;
   
-    writeToRtc(0, (uint32_t*)&systemState, sizeof(SystemState));
+    systemState.writeToRtc(0);
     
     ESP.deepSleep(sleepMillis * 1000);
   }
@@ -268,58 +267,5 @@ void updateVaporPressure(TH *th)
   float vaporPressure = th->humidity/100 * saturationVaporPressure;
 
   th->vaporPressure = vaporPressure;
-}
-
-bool readFromRtc(uint16_t slot, uint32_t *data, uint16_t structSize)
-{
-  uint32_t offset = slot * 64;
-  
-  bool readOk = ESP.rtcUserMemoryRead(offset, data, structSize);
-
-  if (!readOk)
-    Serial.println("!! Reading RTC failed");
-  
-  uint32_t crcOfRead = CRC32::calculate(((uint8_t *)data) + 4, structSize - 4);
-
-/*
-  if (slot > 1) {
-    Serial.print("Reading state ");
-  uint8_t *x = (uint8_t*)data;
-  for (int i=0; i<structSize; i++) {
-    Serial.print(x[i], HEX);
-    Serial.print('_');
-  }
-  Serial.print(" Check value ");
-  Serial.println(crcOfRead, HEX);
-  }
-  */
-  
-  return data[0] == crcOfRead;
-}
-
-void writeToRtc(uint16_t slot, uint32_t *data, uint16_t structSize)
-{
-  uint32_t crcBeforeWrite = CRC32::calculate(((uint8_t *)data) + 4, structSize - 4);
-
-  data[0] = crcBeforeWrite;
-
-/*
-  if (slot > 1) {
-    Serial.print("Writing state ");
-  uint8_t *x = (uint8_t*)data;
-  for (int i=0; i<structSize; i++) {
-    Serial.print(x[i], HEX);
-    Serial.print('_');
-  }
-  Serial.print(" Check value ");
-  Serial.println(crcBeforeWrite, HEX);
-  }
-  */
-  
-  uint32_t offset = slot * 64;
-  bool writeOk = ESP.rtcUserMemoryWrite(offset, data, structSize);
-
-  if (!writeOk)
-    Serial.println("!! Writing RTC failed");
 }
 

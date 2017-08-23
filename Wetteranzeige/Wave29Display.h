@@ -91,12 +91,12 @@ const uint8_t DummyLine[] = {0x3a, 0x1a}; // 4 dummy line per gate
 const uint8_t Gatetime[] = {0x3b, 0x08};  // 2us per line
 const uint8_t RamDataEntryMode[] = {0x11, 0x01};  // Ram data entry mode
 
-
 SpiLine io(SPI, SS, D1, D4);
 
-class DisplayState {
+#include "CrcableData.h"
+
+class DisplayState : public CrcableData {
 public:
-  uint32_t crc32 = 0;
   uint32_t partialUpdateCount = 0;
   bool isInitialized = false;
   bool isFullMode = true;
