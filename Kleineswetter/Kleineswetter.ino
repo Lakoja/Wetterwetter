@@ -17,26 +17,47 @@
 #include <Arduino.h>
 #include <Adafruit_BME280.h>
 #include <ESP8266WiFi.h>
+#include "CrcableData.h"
 
 Adafruit_BME280 bme;
 bool bme_ok = false;
 
-// TODO save last temp and only connect when necessary
+class SystemState : public CrcableData {
+public:
+  float lastTransmittedTemperatature = -100;
+  float lastTransmittedHumidity = -100;
+  unsigned short roundsWithoutTransmission = 0;
+  unsigned short serverSleepSeconds = 60;
+};
+
+SystemState systemState;
 
 void setup() {
+  unsigned long startTime = millis();
+  
   Serial.begin(115200);
 
   Serial.println("Beginning");
 
+  SystemState systemStateFromRtc;
+  bool systemStateValid = systemStateFromRtc.readFromRtc(0, sizeof(SystemState));
+  if (!systemStateValid) {
+    Serial.println("Did not get last system data ");
+  } else {
+    systemState = systemStateFromRtc;
+  }
 
-  if (!bme.begin()) {
+  if (!bme.begin(0x76)) {
     Serial.println("Could not start BME280.");
+    ESP.deepSleep(6e6);
+
+    // TODO this is a serious error
   } else {
     bme_ok = true;
   }
   
   randomSeed(analogRead(A0));
-  float t = 29.7 + random(7);
+  float t = 49.7 + random(7);
   float h = 76.5 - random(5);
 
   if (bme_ok) {
@@ -51,7 +72,7 @@ void setup() {
 
       if (isnan(t) || isnan(h)) {
         Serial.println("Ooop Cannot get meaningful values..Sleeping");
-        ESP.deepSleep(3 * 1000000L);
+        ESP.deepSleep(3e6);
       }
     }
     
@@ -59,7 +80,31 @@ void setup() {
     Serial.print(t);
     Serial.print(" H ");
     Serial.println(h);
+
+    if (systemState.roundsWithoutTransmission < 5) {
+      if (abs(systemState.lastTransmittedTemperatature - t) <= 0.3 
+        && abs(systemState.lastTransmittedHumidity - h) <= 0.6) {
+
+        Serial.print("Do not connect. No change. Time passed since on ");
+        Serial.println(millis() - startTime);
+    
+        systemState.roundsWithoutTransmission++;
+        systemState.writeToRtc(0, sizeof(SystemState));
+    
+        sleepNowForServer(5, startTime);
+      } else {
+        Serial.print("Connect because of change ");
+        Serial.print(abs(systemState.lastTransmittedTemperatature - t));
+        Serial.print(" ");
+        Serial.println(abs(systemState.lastTransmittedHumidity - h));
+      }
+    } else {
+      Serial.print("Connect anyway. Counter ");
+      Serial.println(systemState.roundsWithoutTransmission);
+    }
   }
+
+  // TODO consider system state/counters on all error sleeps!
 
   WiFi.mode(WIFI_STA);
   WiFi.begin("Wettergunde", "3ApCo_rtz_ppopp");
@@ -79,15 +124,13 @@ void setup() {
   Serial.print("Wifi Connected @");
   Serial.println(WiFi.localIP());
 
-
-  // TODO use sleeping for these error cases?
-
   WiFiClient client;
   if (!client.connect(IPAddress(192,168,122,1), 80)) {
     Serial.println("Server connect failed.. Sleeping");
     ESP.deepSleep(14e6, RF_NO_CAL);
   }
-
+  
+  // NOTE/ TODO system start time must also be taken into account
   unsigned long connectionTime = millis();
   Serial.println("Server connected");
 
@@ -104,8 +147,9 @@ void setup() {
 
   String greeting = client.readStringUntil('\n');
 
-  short serverSleepSeconds = 60;
   short serverSecondsUntilOff = 5;
+  
+  // TODO use sleeping for these error cases?
   
   if (!greeting.startsWith("WS")) {
     Serial.print("Greeting from server bogus ");
@@ -115,21 +159,25 @@ void setup() {
   } else {
     int idx = greeting.indexOf('-');
     if (idx < 0) {
-      serverSleepSeconds = greeting.substring(2).toInt();
+      systemState.serverSleepSeconds = greeting.substring(2).toInt();
     } else {
-      serverSleepSeconds = greeting.substring(2, idx).toInt();
+      systemState.serverSleepSeconds = greeting.substring(2, idx).toInt();
       serverSecondsUntilOff = greeting.substring(idx+1).toInt();
+
+      if (serverSecondsUntilOff != 5) {
+        Serial.print("Correcting sleep time by ");
+        Serial.println(serverSecondsUntilOff - 5);
+      }
     }
 
-    if (serverSleepSeconds < 0 || serverSleepSeconds > 600) {
+    if (systemState.serverSleepSeconds < 0 || systemState.serverSleepSeconds > 600) {
       Serial.print("Bogus sleep seconds from server ");
-      Serial.println(serverSleepSeconds);
+      Serial.println(systemState.serverSleepSeconds);
 
-      serverSleepSeconds = 60;
+      systemState.serverSleepSeconds = 60;
     }
   }
 
-  
 
   static char numBuffer1[10];
   static char numBuffer2[10];
@@ -142,6 +190,12 @@ void setup() {
   Serial.print("Sent ");
   Serial.println(outBuffer);
 
+  systemState.lastTransmittedTemperatature = t;
+  systemState.lastTransmittedHumidity = h;
+  systemState.roundsWithoutTransmission = 0;
+
+  systemState.writeToRtc(0, sizeof(SystemState));
+  
 /*
   unsigned long st = millis();
   while (client.available() == 0) {
@@ -160,9 +214,18 @@ void setup() {
 
   //*/
 
-  unsigned long sleepMillis = 1; 
-  if (serverSleepSeconds*1000 > millis() - connectionTime) {
-    sleepMillis = serverSleepSeconds * 1000 - (millis() - connectionTime);
+  sleepNowForServer(serverSecondsUntilOff, connectionTime);
+}
+
+void loop() {
+
+}
+
+void sleepNowForServer(short serverSecondsUntilOff, unsigned long connectionTime)
+{
+    unsigned long sleepMillis = 1; 
+  if (systemState.serverSleepSeconds*1000 > millis() - connectionTime) {
+    sleepMillis = systemState.serverSleepSeconds * 1000 - (millis() - connectionTime);
     sleepMillis += serverSecondsUntilOff - 5; // shift wake up time in the middle
     // TODO consider passed time until here for this
   }
@@ -171,6 +234,3 @@ void setup() {
   ESP.deepSleep(sleepMillis * 1000, RF_NO_CAL);
 }
 
-void loop() {
-
-}
