@@ -80,7 +80,8 @@ void setup() {
     Serial.print(t);
     Serial.print(" H ");
     Serial.println(h);
-
+    
+    //*
     if (systemState.roundsWithoutTransmission < 5) {
       if (abs(systemState.lastTransmittedTemperatature - t) <= 0.3 
         && abs(systemState.lastTransmittedHumidity - h) <= 0.6) {
@@ -102,6 +103,7 @@ void setup() {
       Serial.print("Connect anyway. Counter ");
       Serial.println(systemState.roundsWithoutTransmission);
     }
+    //*/
   }
 
   // TODO consider system state/counters on all error sleeps!
@@ -118,11 +120,11 @@ void setup() {
       // TODO differentiate between successful and unsuccessful sleep time
     }
     
-    delay(300);
+    delay(200);
     Serial.print(".");
   }
-  Serial.print("Wifi Connected @");
-  Serial.println(WiFi.localIP());
+  Serial.print("Wifi Connected took ");
+  Serial.println(millis()-startTime);
 
   WiFiClient client;
   if (!client.connect(IPAddress(192,168,122,1), 80)) {
@@ -164,10 +166,8 @@ void setup() {
       systemState.serverSleepSeconds = greeting.substring(2, idx).toInt();
       serverSecondsUntilOff = greeting.substring(idx+1).toInt();
 
-      if (serverSecondsUntilOff != 5) {
-        Serial.print("Correcting sleep time by ");
-        Serial.println(serverSecondsUntilOff - 5);
-      }
+        Serial.print("Moving sleep time by ");
+        Serial.println(serverSecondsUntilOff - 8);
     }
 
     if (systemState.serverSleepSeconds < 0 || systemState.serverSleepSeconds > 600) {
@@ -223,10 +223,15 @@ void loop() {
 
 void sleepNowForServer(short serverSecondsUntilOff, unsigned long connectionTime)
 {
-    unsigned long sleepMillis = 1; 
+  unsigned long sleepMillis = 1;
+  // TODO also check the serverSecondsUntilOff in this if
   if (systemState.serverSleepSeconds*1000 > millis() - connectionTime) {
     sleepMillis = systemState.serverSleepSeconds * 1000 - (millis() - connectionTime);
-    sleepMillis += serverSecondsUntilOff - 5; // shift wake up time in the middle
+    //Serial.print("Correcting current sleep time ");
+    //Serial.println(sleepMillis);
+    sleepMillis += (serverSecondsUntilOff - 8) * 1000; // shift wake up time to the start of the window
+    //Serial.print("To current sleep time ");
+    //Serial.println(sleepMillis);
     // TODO consider passed time until here for this
   }
   Serial.print("Sleeping ");
