@@ -33,11 +33,10 @@ public:
 SystemState systemState;
 
 void setup() {
-  unsigned long startTime = millis();
+  unsigned long systemStart = millis();
   
   Serial.begin(115200);
-
-  Serial.println("Beginning");
+  Serial.println("Beginning"); // More importantly: move cursor to the beginning of the line
 
   SystemState systemStateFromRtc;
   bool systemStateValid = systemStateFromRtc.readFromRtc(0, sizeof(SystemState));
@@ -75,11 +74,13 @@ void setup() {
         ESP.deepSleep(3e6);
       }
     }
-    
+
+    /*
     Serial.print("T ");
     Serial.print(t);
     Serial.print(" H ");
     Serial.println(h);
+    */
     
     //*
     if (systemState.roundsWithoutTransmission < 5) {
@@ -93,12 +94,13 @@ void setup() {
         && abs(vaporPressureLast - vaporPressureNow) <= 0.5) {
 
         Serial.print("Do not connect. No change. Time passed since on ");
-        Serial.println(millis() - startTime);
+        Serial.println(millis() - systemStart);
     
         systemState.roundsWithoutTransmission++;
         systemState.writeToRtc(0, sizeof(SystemState));
-    
-        sleepNowForServer(8, startTime);
+
+        // TODO "8" here
+        sleepNowForServer(8, millis() - systemStart);
       } else {
         Serial.print("Connect because of change ");
         Serial.print(abs(systemState.lastTransmittedTemperatature - t));
@@ -130,7 +132,7 @@ void setup() {
     Serial.print(".");
   }
   Serial.print("Wifi Connected took ");
-  Serial.println(millis()-startTime);
+  Serial.println(millis()-systemStart);
 
   WiFiClient client;
   if (!client.connect(IPAddress(192,168,122,1), 80)) {
@@ -220,28 +222,28 @@ void setup() {
 
   //*/
 
-  sleepNowForServer(serverSecondsUntilOff, connectionTime);
+  unsigned long systemOnMillis = (millis() - connectionTime) + (connectStart - systemStart);
+
+  sleepNowForServer(serverSecondsUntilOff, systemOnMillis);
 }
 
 void loop() {
 
 }
 
-void sleepNowForServer(short serverSecondsUntilOff, unsigned long connectionTime)
+void sleepNowForServer(short serverSecondsUntilOff, unsigned long systemOnMillis)
 {
   unsigned long sleepMillis = 1;
-  // TODO also check the serverSecondsUntilOff in this if
-  if (systemState.serverSleepSeconds*1000 > millis() - connectionTime) {
-    sleepMillis = systemState.serverSleepSeconds * 1000 - (millis() - connectionTime);
-    //Serial.print("Correcting current sleep time ");
-    //Serial.println(sleepMillis);
-    sleepMillis += (serverSecondsUntilOff - 8) * 1000; // shift wake up time to the start of the window
-    //Serial.print("To current sleep time ");
-    //Serial.println(sleepMillis);
-    // TODO consider passed time until here for this
+  unsigned long correctionMillis = systemOnMillis;
+  if (serverSecondsUntilOff >= 0)
+    correctionMillis += (8 - serverSecondsUntilOff) * 1000; // shift wake up time to the start of the window
+    
+  if (systemState.serverSleepSeconds*1000 > correctionMillis) {
+    sleepMillis = systemState.serverSleepSeconds * 1000 - correctionMillis;
   }
   Serial.print("Sleeping ");
   Serial.println(sleepMillis);
+  
   ESP.deepSleep(sleepMillis * 1000, RF_NO_CAL);
 }
 
