@@ -17,7 +17,7 @@
 #include "Wave29Display.h"
 Wave29Display display;
 
-unsigned long systemSleepSeconds = 60; // including the awaked time
+unsigned long systemSleepSeconds = 180; // including the awaked time
 unsigned long systemAwakeSeconds = 10;
 
 #include "TH.h"
@@ -28,8 +28,8 @@ WeatherServer server(systemSleepSeconds);
 Adafruit_BME280 bme(0);
 bool bme_ok = false;
 
-unsigned long lastLocalUpdate = 0;
-unsigned long lastRemoteUpdate = 0;
+bool determineLocalTemperature = true;
+bool displayUpdated = false;
 unsigned long systemStart = 0;
 
 unsigned long tempUpdateThreshold = 6000L;
@@ -46,21 +46,22 @@ public:
 };
 
 SystemState systemState;
+TH localData;
 
 void setup()
 {
   systemStart = millis();
   
   Serial.begin(115200);
-  Serial.println("Setup");
+  Serial.println(" Setup"); // Most importantly: move to a new line after boot message
   
   DisplayState displayState;
-  bool displayStateValid = displayState.readFromRtc(1);
+  bool displayStateValid = displayState.readFromRtc(1, sizeof(DisplayState));
   if (displayStateValid)
     displayState.isInitialized = false; //TODO ?
     
   SystemState systemStateFromRtc;
-  bool systemStateValid = systemStateFromRtc.readFromRtc(0);
+  bool systemStateValid = systemStateFromRtc.readFromRtc(0, sizeof(SystemState));
   if (!systemStateValid) {
     Serial.println("Did not get last system data ");
   } else {
@@ -93,31 +94,24 @@ void setup()
   }
     uint32_t m2 = millis();
 
+    /*
     Serial.print("Server and BME setup ");
     Serial.print(m1-m0);
     Serial.print(" + ");
     Serial.println(m2-m1);
+    */
 }
 
 void loop()
 {
-  /*
-  while (Serial.available()) {
-    static byte buffer[3];
-    Serial.readBytes(buffer, 2);
-    Serial.println(buffer[0], DEC);
-  }
-  //*/
+  unsigned long loopStart = millis();
+  
+  if (determineLocalTemperature) {
+    determineLocalTemperature = false;
 
-  unsigned long nowLoopStart = millis();
-  if (lastLocalUpdate == 0 || nowLoopStart - lastLocalUpdate >= tempUpdateThreshold) {
-    uint32_t m0 = millis();
-
-    // TODO temperature outside of if - shouldn't be too often though...
-    TH thOne;
-    thOne.dataValid = false;
-    thOne.temperature = 54.0;
-    thOne.humidity = 231.2;
+    localData.dataValid = false;
+    localData.temperature = 54.0;
+    localData.humidity = 231.2;
     
     if (bme_ok) {
       float t = bme.readTemperature() - 1;
@@ -136,31 +130,20 @@ void loop()
       Serial.println(h);
   */    
       if (!isnan(t) && !isnan(h) && t > -100 && t < 100) {
-        thOne.dataValid = true;
-        thOne.temperature = round(t * 5) / 5.0f;
-        thOne.humidity = round(h * 5) / 5.0f;
+        localData.dataValid = true;
+        localData.temperature = round(t * 5) / 5.0f;
+        localData.humidity = round(h * 5) / 5.0f;
 
-        updateVaporPressure(&thOne);
+        updateVaporPressure(&localData);
       } else {
-        thOne.dataValid = false;
+        localData.dataValid = false;
       }
     }
 
-    uint32_t m1 = millis();
-    display.displayValues(&thOne, 1, systemState.accumulatedSystemMillis + (millis() - systemStart));
-    uint32_t m2 = millis();
-
-    Serial.print("Block 1 read and update ");
-    Serial.print(m1-m0);
-    Serial.print(" + ");
-    Serial.println(m2-m1);
-
-    lastLocalUpdate = millis();  
+    //display.displayValues(&thOne, 1, systemState.accumulatedSystemMillis + (millis() - systemStart));
   }
 
   // TODO blank values if not up to date (> 5 minutes?)
-
-    uint32_t m1 = millis();
 
   unsigned long systemActive = millis() - systemStart;
   unsigned int secondsUntilOff = 0;
@@ -170,67 +153,36 @@ void loop()
   TH externalData;
   bool dataReceived = server.receiveData(&externalData, secondsUntilOff);
 
+  bool sleepNow = false;
   if (dataReceived && externalData.dataValid) {
     updateVaporPressure(&externalData);
-
-    Serial.print("Setting external data in system state ");
-    Serial.print(externalData.humidity);
     
     systemState.externalDataValid = true;
     systemState.lastExternalTemperature = externalData.temperature;
     systemState.lastExternalHumidity = externalData.humidity;
     systemState.lastExternalValuesMillis = systemState.accumulatedSystemMillis + (millis() - systemStart);
 
-    Serial.print(" ");
-    Serial.println(systemState.lastExternalValuesMillis);
-  } else if (systemState.externalDataValid) {
-    // TODO consider time somehow
-    
-    externalData.dataValid = true;
-    externalData.temperature = systemState.lastExternalTemperature;
-    externalData.humidity = systemState.lastExternalHumidity;
-    updateVaporPressure(&externalData);
+    updateDisplay(&localData, &externalData);
+    sleepNow = true;
   }
-
-    uint32_t m2 = millis();
-
-/*
-    Serial.print("c");
-    Serial.print(m2-m1);
-    */
-    
-  unsigned long nowLoopMiddle = millis();
-
-  // TODO consider age of shown data vs tempUpdateThreshold
-  if (externalData.dataValid && (lastRemoteUpdate == 0 || dataReceived)) { //nowLoopMiddle - lastRemoteUpdate >= tempUpdateThreshold)) {
-    Serial.print("Showing external data ");
-    Serial.print(externalData.humidity);
-    Serial.print(" ");
-    Serial.println(systemState.lastExternalValuesMillis);
-
-    display.displayValues(&externalData, 2, systemState.lastExternalValuesMillis);
-    lastRemoteUpdate = millis();
-    
-    // TODO? should be there after reset
-    //systemState.lastExternalData.dataValid = false; // Wait for new data
-  } else if (dataReceived) {
-    Serial.print("Do not show external data ");
-    Serial.print(externalData.dataValid);
-    Serial.print(" ");
-    Serial.print(lastRemoteUpdate);
-    Serial.print(" ");
-    Serial.println(nowLoopMiddle);
-  }
-
-  unsigned long nowLoopEnd = millis();
-  if (nowLoopEnd - systemStart > systemAwakeSeconds * 1000) {
-
-/*
-    systemState2.accumulatedSystemMillis++;
-    writeToRtc(3, (uint32_t*) &systemState2, sizeof(SystemState));
-    */
   
-    unsigned long systemActive = nowLoopEnd - systemStart;
+  bool shouldSleepNow = millis() - systemStart > systemAwakeSeconds * 1000;
+
+  if (shouldSleepNow && !displayUpdated) {
+    if (systemState.externalDataValid) {
+      externalData.dataValid = true;
+      externalData.temperature = systemState.lastExternalTemperature;
+      externalData.humidity = systemState.lastExternalHumidity;
+      updateVaporPressure(&externalData);
+    }
+    
+    updateDisplay(&localData, &externalData);
+  }
+
+  unsigned long loopEnd = millis();
+  
+  if (sleepNow || shouldSleepNow) {
+    unsigned long systemActive = loopEnd - systemStart;
     
     unsigned long sleepMillis = 1;
     if (systemSleepSeconds * 1000 > systemActive)
@@ -239,22 +191,32 @@ void loop()
     Serial.println(sleepMillis);
 
     DisplayState *displayState = display.getState();
-    displayState->writeToRtc(1);
-
+    displayState->writeToRtc(1, sizeof(DisplayState));
 
     systemState.accumulatedSystemMillis = systemState.accumulatedSystemMillis + systemActive + sleepMillis;
-  
-    systemState.writeToRtc(0);
+    systemState.writeToRtc(0, sizeof(SystemState));
     
     ESP.deepSleep(sleepMillis * 1000);
   }
 
-  unsigned long loopTook = nowLoopEnd - nowLoopStart;
+  unsigned long loopTook = loopEnd - loopStart;
   if (loopTook < 100) {
     delay(100 - loopTook);
   } else {
     delay(1); // yield
   }
+}
+
+void updateDisplay(TH *local, TH *external)
+{
+  // TODO / NOTE the local time here is meaningless
+  display.displayValues(local, 1, systemState.accumulatedSystemMillis + (millis() - systemStart));
+  display.displayValues(external, 2, systemState.lastExternalValuesMillis);
+
+  // TODO consider age of shown data vs tempUpdateThreshold
+
+  display.updatePartOrFull();
+  displayUpdated = true;
 }
 
 void updateVaporPressure(TH *th)

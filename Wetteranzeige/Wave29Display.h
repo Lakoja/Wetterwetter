@@ -263,10 +263,21 @@ public:
       Serial.print(" ");
       Serial.println(formatted);
       */
-    
+  }
+  
+  virtual void fillScreen(uint16_t color)
+  {
+    memset(pixelBuffer, (uint8_t)color, sizeof(pixelBuffer));
+    changeRect.addPixel(0, 0);
+    changeRect.addPixel(GDEH029A1_LAST_X, GDEH029A1_LAST_Y);
+  }
+
+  void updatePartOrFull()
+  {
     if (state.partialUpdateCount >= partialUpdateThreshold) {
       state.partialUpdateCount = 0;
-      
+
+      // TODO necessary?
       update();
       
       initFullMode();
@@ -282,13 +293,6 @@ public:
       state.partialUpdateCount++;
       update();
     }
-  }
-  
-  virtual void fillScreen(uint16_t color)
-  {
-    memset(pixelBuffer, (uint8_t)color, sizeof(pixelBuffer));
-    changeRect.addPixel(0, 0);
-    changeRect.addPixel(GDEH029A1_LAST_X, GDEH029A1_LAST_Y);
   }
 
   virtual void update()
@@ -409,11 +413,13 @@ private:
       uint32_t m2 = millis();
 
       if (true || first) {
+        /* TODO
         Serial.print(state.isFullMode ? "Full" : "Part");
         Serial.print(" update ");
         Serial.print(m1-m0);
         Serial.print(" + ");
         Serial.println(m2-m1);
+        */
   
         first = false;
       }

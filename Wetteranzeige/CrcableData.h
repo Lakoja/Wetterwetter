@@ -24,11 +24,11 @@ private:
   uint32_t crc32;
 
 public:
-  bool readFromRtc(uint16_t slot)
+  bool readFromRtc(uint16_t slot, uint16_t structSize)
   {
     uint32_t offset = slot * 64;
     uint32_t *data = (uint32_t*)this;
-    uint16_t structSize = sizeof(this);
+    //uint16_t structSize = sizeof(this);
     
     bool readOk = ESP.rtcUserMemoryRead(offset, data, structSize);
   
@@ -53,13 +53,13 @@ public:
     return crc32 == crcOfRead;
   }
   
-  void writeToRtc(uint16_t slot)
+  void writeToRtc(uint16_t slot, uint16_t structSize)
   {
     // TODO check for size: only 64 bytes allowed here
     
     uint32_t offset = slot * 64;
     uint32_t *data = (uint32_t*)this;
-    uint16_t structSize = sizeof(this);
+    //uint16_t structSize = sizeof(this);
     
     uint32_t crcBeforeWrite = CRC32::calculate(((uint8_t *)data) + 4, structSize - 4);
   
