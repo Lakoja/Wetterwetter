@@ -83,8 +83,14 @@ void setup() {
     
     //*
     if (systemState.roundsWithoutTransmission < 5) {
-      if (abs(systemState.lastTransmittedTemperatature - t) <= 0.3 
-        && abs(systemState.lastTransmittedHumidity - h) <= 0.6) {
+      float vaporPressureLast = -100;
+      if (systemState.lastTransmittedHumidity > 0) {
+        vaporPressureLast = getVaporPressure(systemState.lastTransmittedTemperatature, systemState.lastTransmittedHumidity);
+      }
+      float vaporPressureNow = getVaporPressure(t, h);
+      
+      if (abs(systemState.lastTransmittedTemperatature - t) <= 0.5 
+        && abs(vaporPressureLast - vaporPressureNow) <= 0.5) {
 
         Serial.print("Do not connect. No change. Time passed since on ");
         Serial.println(millis() - startTime);
@@ -237,5 +243,14 @@ void sleepNowForServer(short serverSecondsUntilOff, unsigned long connectionTime
   Serial.print("Sleeping ");
   Serial.println(sleepMillis);
   ESP.deepSleep(sleepMillis * 1000, RF_NO_CAL);
+}
+
+float getVaporPressure(float temp, float humid)
+{
+  // The Magnus formula (T >= 0)
+  // TODO < 0 a = 7.6, b = 240.7 für T < 0 über Wasser (Taupunkt)
+  
+  float saturationVaporPressure = 6.1078f * pow(10, ((7.5f*temp)/(237.3f+temp)));
+  return humid/100 * saturationVaporPressure;
 }
 
