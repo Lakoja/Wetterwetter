@@ -98,7 +98,7 @@ void setup() {
         systemState.roundsWithoutTransmission++;
         systemState.writeToRtc(0, sizeof(SystemState));
     
-        sleepNowForServer(5, startTime);
+        sleepNowForServer(8, startTime);
       } else {
         Serial.print("Connect because of change ");
         Serial.print(abs(systemState.lastTransmittedTemperatature - t));
