@@ -55,10 +55,10 @@ void setup()
   Serial.begin(115200);
   Serial.println(" Setup"); // Most importantly: move to a new line after boot message
   
-  DisplayState displayState;
-  bool displayStateValid = displayState.readFromRtc(1, sizeof(DisplayState));
+  DisplayStateWrapper displayState;
+  bool displayStateValid = displayState.readFromRtc(1, sizeof(DisplayStateWrapper));
   if (displayStateValid)
-    displayState.isInitialized = false; //TODO ?
+    displayState.displayState.isInitialized = false; //TODO ?
     
   SystemState systemStateFromRtc;
   bool systemStateValid = systemStateFromRtc.readFromRtc(0, sizeof(SystemState));
@@ -68,7 +68,7 @@ void setup()
     systemState = systemStateFromRtc;
   }
     
-  display.init(displayStateValid ? &displayState : NULL);
+  display.initWave29(displayStateValid ? &displayState : NULL);
   display.setRotation(1);
 
   if (!displayStateValid) { // || !displayState.isInitialized) {
@@ -190,8 +190,8 @@ void loop()
     Serial.print("Sleeping ");
     Serial.println(sleepMillis);
 
-    DisplayState *displayState = display.getState();
-    displayState->writeToRtc(1, sizeof(DisplayState));
+    DisplayStateWrapper *displayState = display.getState();
+    displayState->writeToRtc(1, sizeof(DisplayStateWrapper));
 
     systemState.accumulatedSystemMillis = systemState.accumulatedSystemMillis + systemActive + sleepMillis;
     systemState.writeToRtc(0, sizeof(SystemState));
