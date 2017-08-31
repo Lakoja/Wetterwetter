@@ -67,7 +67,7 @@ void setup()
   } else {
     systemState = systemStateFromRtc;
   }
-    
+
   display.initWave29(displayStateValid ? &displayState : NULL);
   display.setRotation(1);
 
@@ -104,6 +104,8 @@ void setup()
 
 void loop()
 {
+  // TODO display something on very first start right away
+  
   unsigned long loopStart = millis();
   
   if (determineLocalTemperature) {

@@ -38,12 +38,14 @@ private:
   uint16_t blockHeight = 124;
 
 public:
-  Wave29Display(bool operateAsync = false) :  EpdDisplay(operateAsync)
+  Wave29Display(bool operateAsync = false) :  
+    EpdDisplay(EPD_2x9_DISPLAY_WIDTH, EPD_2x9_DISPLAY_HEIGHT, operateAsync)
   {
   }
 
   DisplayStateWrapper* getState()
   {
+    state.displayState = *EpdDisplay::getState();
     return &state;
   }
 
@@ -63,7 +65,7 @@ public:
       swap(x, y);
       swap(w, h);
     }
-    
+
     fillRect(x, y, w, h, EPD_WHITE);
     drawRect(x+2, y+2, w-4, h-4, EPD_BLACK);
 
@@ -71,7 +73,7 @@ public:
       setFont(&FreeMonoBold18pt7b);
       setTextColor(EPD_BLACK);
       
-      setCursor(x + 16, y + 28);
+      setCursor(x + 16, y + 30);
   
       /* TODO use / consider single digits and negative
       static char formatted[8];
@@ -84,6 +86,8 @@ public:
       println('c');
       print(th->vaporPressure, 1);
       println("p");
+      setFont(&FreeMonoBold12pt7b);
+      setCursor(x + 52, y + 96);
       print(th->humidity, 1);
       println('%');
     }
@@ -92,7 +96,7 @@ public:
     setCursor(x + 30, y + 122);
     print('t');
     static char formatted[12];
-    dtostrf(millisOn / 1000.0f, 7, 1, formatted);
+    dtostrf(millisOn / 1000.0f, 7, 0, formatted);
     println(formatted);
 
 /*
