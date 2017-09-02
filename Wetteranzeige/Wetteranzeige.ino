@@ -57,8 +57,6 @@ void setup()
   
   DisplayStateWrapper displayState;
   bool displayStateValid = displayState.readFromRtc(1, sizeof(DisplayStateWrapper));
-  if (displayStateValid)
-    displayState.displayState.isInitialized = false; //TODO ?
     
   SystemState systemStateFromRtc;
   bool systemStateValid = systemStateFromRtc.readFromRtc(0, sizeof(SystemState));
@@ -71,7 +69,7 @@ void setup()
   display.initWave29(displayStateValid ? &displayState : NULL);
   display.setRotation(1);
 
-  if (!displayStateValid) { // || !displayState.isInitialized) {
+  if (!displayStateValid) {
     Serial.println("Doing first display update with pattern");
     display.initFullMode();
     display.fillScreen(0x36); // a line pattern
@@ -79,33 +77,20 @@ void setup()
     display.initPartialMode();
   } else {
     display.initPartialMode();
-    display.fillScreen(EPD_WHITE);
+    display.fillScreen(EPD_BLACK);
   }
 
-  uint32_t m0 = millis();
-
   server.begin();
-  uint32_t m1 = millis();
   
   if (!bme.begin()) {
     Serial.println("No BME!");
   } else {
     bme_ok = true;
   }
-    uint32_t m2 = millis();
-
-    /*
-    Serial.print("Server and BME setup ");
-    Serial.print(m1-m0);
-    Serial.print(" + ");
-    Serial.println(m2-m1);
-    */
 }
 
 void loop()
 {
-  // TODO display something on very first start right away
-  
   unsigned long loopStart = millis();
   
   if (determineLocalTemperature) {
@@ -124,13 +109,7 @@ void loop()
         t = bme.readTemperature() - 1;
         h = bme.readHumidity();
       }
-
-  /*
-      Serial.print("Local ");
-      Serial.print(t);
-      Serial.print(' ');
-      Serial.println(h);
-  */    
+   
       if (!isnan(t) && !isnan(h) && t > -100 && t < 100) {
         localData.dataValid = true;
         localData.temperature = round(t * 5) / 5.0f;
@@ -141,8 +120,6 @@ void loop()
         localData.dataValid = false;
       }
     }
-
-    //display.displayValues(&thOne, 1, systemState.accumulatedSystemMillis + (millis() - systemStart));
   }
 
   // TODO blank values if not up to date (> 5 minutes?)

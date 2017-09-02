@@ -99,12 +99,7 @@ public:
     dtostrf(millisOn / 1000.0f, 7, 0, formatted);
     println(formatted);
 
-/*
-      Serial.print("Showing time for ");
-      Serial.print(whichBlock);
-      Serial.print(" ");
-      Serial.println(formatted);
-      */
+    // TODO show offset to local time (only)
   }
 };
 
