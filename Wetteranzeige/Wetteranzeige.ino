@@ -48,12 +48,23 @@ public:
 SystemState systemState;
 TH localData;
 
+ADC_MODE(ADC_VCC);
+
 void setup()
 {
   systemStart = millis();
   
   Serial.begin(115200);
   Serial.println(" Setup"); // Most importantly: move to a new line after boot message
+
+/*
+  Serial.print("Chip id ");
+  Serial.print(ESP.getChipId());
+  Serial.print(" Flash size ");
+  Serial.print(ESP.getFlashChipRealSize());
+  Serial.print(" Vcc ");
+  Serial.println(ESP.getVcc());
+  */
   
   DisplayStateWrapper displayState;
   bool displayStateValid = displayState.readFromRtc(1, sizeof(DisplayStateWrapper));
@@ -86,6 +97,7 @@ void setup()
     Serial.println("No BME!");
   } else {
     bme_ok = true;
+    delay(100); // Allow things to settle after begin()
   }
 }
 
@@ -97,14 +109,13 @@ void loop()
     determineLocalTemperature = false;
 
     localData.dataValid = false;
-    localData.temperature = 54.0;
-    localData.humidity = 231.2;
     
     if (bme_ok) {
       float t = bme.readTemperature() - 1;
       float h = bme.readHumidity();
 
       if (isnan(t) || isnan(h)) {
+        Serial.println("First local temp read was invalid");
         delay(100);
         t = bme.readTemperature() - 1;
         h = bme.readHumidity();
@@ -188,9 +199,9 @@ void loop()
 
 void updateDisplay(TH *local, TH *external)
 {
-  // TODO / NOTE the local time here is meaningless
-  display.displayValues(local, 1, systemState.accumulatedSystemMillis + (millis() - systemStart));
-  display.displayValues(external, 2, systemState.lastExternalValuesMillis);
+  unsigned long totalOnMillis = systemState.accumulatedSystemMillis + (millis() - systemStart);
+  display.displayValues(local, 1, totalOnMillis);
+  display.displayValues(external, 2, totalOnMillis - systemState.lastExternalValuesMillis);
 
   // TODO consider age of shown data vs tempUpdateThreshold
 
@@ -200,10 +211,18 @@ void updateDisplay(TH *local, TH *external)
 
 void updateVaporPressure(TH *th)
 {
-  // The Magnus formula (T >= 0)
-  // TODO < 0 a = 7.6, b = 240.7 für T < 0 über Wasser (Taupunkt)
+  // The Magnus formula
+  //
   
-  float saturationVaporPressure = 6.1078f * pow(10, ((7.5f*th->temperature)/(237.3f+th->temperature)));
+  float a = 7.5f;
+  float b = 237.3f;
+
+  if (th->temperature < 0) {
+    a = 7.6f;
+    b = 240.7f;
+  }
+  
+  float saturationVaporPressure = 6.1078f * pow(10, ((a*th->temperature)/(b+th->temperature)));
 
   float vaporPressure = th->humidity/100 * saturationVaporPressure;
 

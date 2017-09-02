@@ -54,7 +54,7 @@ public:
     EpdDisplay::init(NULL != state ? &state->displayState : NULL);
   }
 
-  void displayValues(TH *th, uint8_t whichBlock, unsigned long millisOn)
+  void displayValues(TH *th, uint8_t whichBlock, unsigned long millisDiff)
   {
     int16_t x = 0, y = 0, w = width(), h = blockHeight;
     if (2 == whichBlock) {
@@ -70,36 +70,57 @@ public:
     drawRect(x+2, y+2, w-4, h-4, EPD_BLACK);
 
     if (th->dataValid) {
+      // NOTE / TODO the fonts are modified for the . and : to use less width
+      
       setFont(&FreeMonoBold18pt7b);
       setTextColor(EPD_BLACK);
       
-      setCursor(x + 16, y + 30);
-  
-      /* TODO use / consider single digits and negative
-      static char formatted[8];
-      dtostrf(th->temperature, 4, 1, formatted);
-      println(formatted);
-      dtostrf(th->humidity, 4, 1, formatted);
-      println(formatted);
-      */
-      print(th->temperature, 1);
+      setCursor(x + 18, y + 30);
+
+      //dtostrf(th->temperature, 4, 1, formatted);
+
+      printFloat(th->temperature);
       println('c');
-      print(th->vaporPressure, 1);
+      
+      printFloat(th->vaporPressure);
       println("p");
+      
       setFont(&FreeMonoBold12pt7b);
-      setCursor(x + 52, y + 96);
-      print(th->humidity, 1);
+      setCursor(x + 54, y + 96);
+      printFloat(th->humidity);
       println('%');
     }
 
     setFont(&FreeMonoBold9pt7b);
-    setCursor(x + 30, y + 122);
-    print('t');
-    static char formatted[12];
-    dtostrf(millisOn / 1000.0f, 7, 0, formatted);
-    println(formatted);
+    setCursor(x + 17, y + 122);
+    printTime(millisDiff);
+  }
 
-    // TODO show offset to local time (only)
+  void printFloat(float f)
+  {
+      static char formatted[12];
+      
+      sprintf(formatted, "%2d", (int)f);
+      print(formatted);
+      print('.');
+      sprintf(formatted, "%1d", (int)(10*f) % 10);
+      print(formatted);
+  }
+
+  void printTime(unsigned long milli)
+  {
+    static char timeFormatted[12];
+
+    long seconds = milli / 1000;
+    int h = seconds / 3600;
+    int m = (seconds / 60) % 60;
+    int s = seconds % 60;
+
+    if (h != 0)
+      sprintf(timeFormatted, "t %2d:%02d:%02d", h, m, s);
+    else
+      sprintf(timeFormatted, "t :%4d:%02d", m, s);
+    print(timeFormatted);
   }
 };
 
