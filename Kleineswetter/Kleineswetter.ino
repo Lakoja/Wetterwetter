@@ -60,12 +60,12 @@ void setup() {
   float h = 76.5 - random(5);
 
   if (bme_ok) {
-    delay(200);
+    delay(150);
     t = bme.readTemperature() - 1;
     h = bme.readHumidity();
 
     if (isnan(t) || isnan(h)) {
-      delay(10);
+      delay(50);
       t = bme.readTemperature() - 1;
       h = bme.readHumidity();
 
@@ -120,9 +120,9 @@ void setup() {
 
   unsigned long connectStart = millis();
   while (WiFi.status() != WL_CONNECTED) {
-    if (millis() - connectStart > 10000) {
-      Serial.println("Cannot connect to WiFi .. Sleeping");
-      ESP.deepSleep(6e6, RF_NO_CAL); // NOTE this must be taken plus the wait time above
+    if (millis() - connectStart > 5000) {
+      Serial.println("Waiting...");
+      ESP.deepSleep(5e6, RF_NO_CAL); // NOTE this must be taken plus the wait time above
 
       // TODO differentiate between successful and unsuccessful sleep time
     }
@@ -130,7 +130,7 @@ void setup() {
     delay(200);
     Serial.print(".");
   }
-  Serial.print("Wifi Connected took ");
+  //Serial.print("Wifi Connected took ");
   Serial.println(millis()-systemStart);
 
   WiFiClient client;
