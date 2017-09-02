@@ -248,10 +248,19 @@ void sleepNowForServer(short serverSecondsUntilOff, unsigned long systemOnMillis
 
 float getVaporPressure(float temp, float humid)
 {
-  // The Magnus formula (T >= 0)
-  // TODO < 0 a = 7.6, b = 240.7 für T < 0 über Wasser (Taupunkt)
+  // The Magnus formula
+  //
   
-  float saturationVaporPressure = 6.1078f * pow(10, ((7.5f*temp)/(237.3f+temp)));
+  float a = 7.5f;
+  float b = 237.3f;
+
+  if (temp < 0) {
+    a = 7.6f;
+    b = 240.7f;
+  }
+  
+  float saturationVaporPressure = 6.1078f * pow(10, ((a*temp)/(b+temp)));
+
   return humid/100 * saturationVaporPressure;
 }
 
