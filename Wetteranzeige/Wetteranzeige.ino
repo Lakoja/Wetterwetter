@@ -38,6 +38,8 @@ unsigned long tempUpdateThreshold = 6000L;
 
 class SystemState : public CrcableData {
 public:
+  float displayedInternalTemperature = -100;
+  float displayedInternalHumidity = -100;
   bool externalDataValid = false;
   float lastExternalTemperature = 0;
   float lastExternalHumidity = 0;
@@ -159,14 +161,36 @@ void loop()
   bool shouldSleepNow = millis() - systemStart > systemAwakeSeconds * 1000;
 
   if (shouldSleepNow && !displayUpdated) {
-    if (systemState.externalDataValid) {
-      externalData.dataValid = true;
-      externalData.temperature = systemState.lastExternalTemperature;
-      externalData.humidity = systemState.lastExternalHumidity;
-      updateVaporPressure(&externalData);
+    boolean internalIsToBeShown = systemState.displayedInternalTemperature == -100;
+
+    if (!internalIsToBeShown) {
+      TH lastInternalData;
+      lastInternalData.temperature = systemState.displayedInternalTemperature;
+      lastInternalData.humidity = systemState.displayedInternalHumidity;
+      updateVaporPressure(&lastInternalData);
+
+      if (abs(systemState.displayedInternalTemperature - localData.temperature) > 0.2
+          || abs(lastInternalData.vaporPressure - localData.vaporPressure) > 0.29) {
+          internalIsToBeShown = true;
+
+          Serial.print("Updating because of difference ");
+          Serial.println(abs(systemState.displayedInternalTemperature - localData.temperature));
+      } else {
+        Serial.println("No update. No external data and no internal change.");
+        // NOTE the "update at least every X tries" is handled indirectly by the external source
+      }
     }
-    
-    updateDisplay(&localData, &externalData);
+
+    if (internalIsToBeShown) {
+      if (systemState.externalDataValid) {
+        externalData.dataValid = true;
+        externalData.temperature = systemState.lastExternalTemperature;
+        externalData.humidity = systemState.lastExternalHumidity;
+        updateVaporPressure(&externalData);
+      }
+      
+      updateDisplay(&localData, &externalData);
+    }
   }
 
   unsigned long loopEnd = millis();
@@ -177,7 +201,10 @@ void loop()
     unsigned long sleepMillis = 1;
     if (systemSleepSeconds * 1000 > systemActive)
       sleepMillis = systemSleepSeconds * 1000 - systemActive;
+    
     Serial.print("Sleeping ");
+    if (shouldSleepNow)
+      Serial.print(" in vain ");
     Serial.println(sleepMillis);
 
     DisplayStateWrapper *displayState = display.getState();
@@ -200,9 +227,15 @@ void loop()
 void updateDisplay(TH *local, TH *external)
 {
   unsigned long totalOnMillis = systemState.accumulatedSystemMillis + (millis() - systemStart);
+
+  // TODO check for validity of internal (or external) data?
+  
   display.displayValues(local, 1, totalOnMillis);
   display.displayValues(external, 2, totalOnMillis - systemState.lastExternalValuesMillis);
 
+  systemState.displayedInternalTemperature = local->temperature;
+  systemState.displayedInternalHumidity = local->humidity;
+  
   // TODO consider age of shown data vs tempUpdateThreshold
 
   display.updatePartOrFull();
