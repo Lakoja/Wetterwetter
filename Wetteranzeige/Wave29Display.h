@@ -92,7 +92,7 @@ public:
     }
 
     setFont(&FreeMonoBold9pt7b);
-    setCursor(x + 17, y + 122);
+    setCursor(x + 23, y + 122);
     printTime(millisDiff);
   }
 
@@ -117,9 +117,9 @@ public:
     int s = seconds % 60;
 
     if (h != 0)
-      sprintf(timeFormatted, "t %2d:%02d:%02d", h, m, s);
+      sprintf(timeFormatted, "t %4d:%02d", h, m);
     else
-      sprintf(timeFormatted, "t :%4d:%02d", m, s);
+      sprintf(timeFormatted, "t %4d:%02d", m, s);
     print(timeFormatted);
   }
 };
