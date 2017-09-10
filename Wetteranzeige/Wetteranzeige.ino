@@ -32,7 +32,7 @@ bool determineLocalTemperature = true;
 bool displayUpdated = false;
 unsigned long systemStart = 0;
 
-unsigned long tempUpdateThreshold = 6000L;
+uint8_t cyclesWithoutUpdateThreshold = 5;
 
 #include "CrcableData.h"
 
@@ -40,6 +40,7 @@ class SystemState : public CrcableData {
 public:
   float displayedInternalTemperature = -100;
   float displayedInternalHumidity = -100;
+  uint8_t cyclesWithoutShow = 0;
   bool externalDataValid = false;
   float lastExternalTemperature = 0;
   float lastExternalHumidity = 0;
@@ -50,7 +51,7 @@ public:
 SystemState systemState;
 TH localData;
 
-ADC_MODE(ADC_VCC);
+//ADC_MODE(ADC_VCC);
 
 void setup()
 {
@@ -164,20 +165,25 @@ void loop()
     boolean internalIsToBeShown = systemState.displayedInternalTemperature == -100;
 
     if (!internalIsToBeShown) {
-      TH lastInternalData;
-      lastInternalData.temperature = systemState.displayedInternalTemperature;
-      lastInternalData.humidity = systemState.displayedInternalHumidity;
-      updateVaporPressure(&lastInternalData);
-
-      if (abs(systemState.displayedInternalTemperature - localData.temperature) > 0.21
-          || abs(lastInternalData.vaporPressure - localData.vaporPressure) > 0.29) {
-          internalIsToBeShown = true;
-
-          Serial.print("Updating because of difference ");
-          Serial.println(abs(systemState.displayedInternalTemperature - localData.temperature));
+      if (systemState.cyclesWithoutShow > cyclesWithoutUpdateThreshold) {
+        Serial.println("Update after no shows");
+        internalIsToBeShown = true;
       } else {
-        Serial.println("No update. No external data and no internal change.");
-        // NOTE the "update at least every X tries" is handled indirectly by the external source
+        TH lastInternalData;
+        lastInternalData.temperature = systemState.displayedInternalTemperature;
+        lastInternalData.humidity = systemState.displayedInternalHumidity;
+        updateVaporPressure(&lastInternalData);
+  
+        if (abs(systemState.displayedInternalTemperature - localData.temperature) > 0.21
+            || abs(lastInternalData.vaporPressure - localData.vaporPressure) > 0.29) {
+            internalIsToBeShown = true;
+  
+            Serial.print("Updating because of difference ");
+            Serial.println(abs(systemState.displayedInternalTemperature - localData.temperature));
+        } else {
+          Serial.println("No update. No external data and no internal change.");
+          // NOTE the "update at least every X tries" is handled indirectly by the external source
+        }
       }
     }
 
@@ -190,6 +196,8 @@ void loop()
       }
       
       updateDisplay(&localData, &externalData);
+    } else {
+      systemState.cyclesWithoutShow++;
     }
   }
 
@@ -240,6 +248,7 @@ void updateDisplay(TH *local, TH *external)
 
   display.updatePartOrFull();
   displayUpdated = true;
+  systemState.cyclesWithoutShow = 0;
 }
 
 void updateVaporPressure(TH *th)
