@@ -117,9 +117,9 @@ public:
     int s = seconds % 60;
 
     if (h != 0)
-      sprintf(timeFormatted, "t %4d:%02d", h, m);
+      sprintf(timeFormatted, "h %4d:%02d", h, m);
     else
-      sprintf(timeFormatted, "t %4d:%02d", m, s);
+      sprintf(timeFormatted, "m %4d:%02d", m, s);
     print(timeFormatted);
   }
 };

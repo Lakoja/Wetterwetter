@@ -90,7 +90,7 @@ void setup()
     display.initPartialMode();
   } else {
     display.initPartialMode();
-    display.fillScreen(EPD_BLACK);
+    display.fillScreen(EPD_WHITE);
   }
 
   server.begin();
@@ -169,7 +169,7 @@ void loop()
       lastInternalData.humidity = systemState.displayedInternalHumidity;
       updateVaporPressure(&lastInternalData);
 
-      if (abs(systemState.displayedInternalTemperature - localData.temperature) > 0.2
+      if (abs(systemState.displayedInternalTemperature - localData.temperature) > 0.21
           || abs(lastInternalData.vaporPressure - localData.vaporPressure) > 0.29) {
           internalIsToBeShown = true;
 
