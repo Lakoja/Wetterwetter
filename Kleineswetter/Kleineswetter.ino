@@ -34,6 +34,7 @@ public:
 SystemState systemState;
 
 unsigned long connectInvainThreshold = 8 * 60 * 1000L; // some minutes
+unsigned int connectTryThreshold = 7000;
 
 void setup() {
   unsigned long systemStart = millis();
@@ -64,7 +65,7 @@ void setup() {
   float h = 76.5 - random(5);
 
   if (bme_ok) {
-    delay(150);
+    delay(250);
     t = bme.readTemperature() - 1;
     h = bme.readHumidity();
 
@@ -120,7 +121,7 @@ void setup() {
   unsigned long connectStart = millis();
   while (WiFi.status() != WL_CONNECTED) {
     unsigned long now = millis();
-    if (now - connectStart > 5000) {
+    if (now - connectStart > connectTryThreshold) {
       sleepNowForFailedConnect(5000L, now - systemStart);
 
       /*
