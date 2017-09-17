@@ -27,10 +27,13 @@ public:
   float lastTransmittedTemperatature = -100;
   float lastTransmittedHumidity = -100;
   unsigned short roundsWithoutTransmission = 0;
+  unsigned long connectMillisCumulated = 0;
   unsigned short serverSleepSeconds = 60;
 };
 
 SystemState systemState;
+
+unsigned long connectInvainThreshold = 8 * 60 * 1000L; // some minutes
 
 void setup() {
   unsigned long systemStart = millis();
@@ -120,22 +123,50 @@ void setup() {
 
   unsigned long connectStart = millis();
   while (WiFi.status() != WL_CONNECTED) {
-    if (millis() - connectStart > 5000) {
-      Serial.println("Waiting...");
-      ESP.deepSleep(5e6, RF_NO_CAL); // NOTE this must be taken plus the wait time above
+    unsigned long now = millis();
+    if (now - connectStart > 5000) {
+      unsigned long sleepMillis = 5000;
+      systemState.connectMillisCumulated += now - systemStart;
 
+      if (systemState.connectMillisCumulated >= connectInvainThreshold) {
+        systemState.connectMillisCumulated = 0;
+        sleepMillis = 45 * 60 * 1000L; // sleep long
+      }
+      
+      systemState.writeToRtc(0, sizeof(SystemState));
+
+      Serial.print("Waiting ");
+      Serial.println(sleepMillis);
+      
+      ESP.deepSleep(sleepMillis * 1000, RF_NO_CAL); // NOTE this must be taken plus the wait time above
+
+      /*
+      // This has 15mA instead of 70mA (above) or 1mA with deep sleep
+      WiFi.disconnect(true);
+      WiFi.setSleepMode(WIFI_MODEM_SLEEP);
+      WiFi.forceSleepBegin();
+      delay(5000);
+      WiFi.forceSleepWake();
+      connectStart = millis();
+      WiFi.begin("Wettergunde", "3ApCo_rtz_ppopp");
+      */
+      
       // TODO differentiate between successful and unsuccessful sleep time
     }
     
     delay(200);
     Serial.print(".");
   }
-  //Serial.print("Wifi Connected took ");
   Serial.println(millis()-systemStart);
+
+  systemState.connectMillisCumulated = 0;
+  // TODO write
 
   WiFiClient client;
   if (!client.connect(IPAddress(192,168,122,1), 80)) {
     Serial.println("Server connect failed.. Sleeping");
+
+    // TODO consider invain threshold
     ESP.deepSleep(14e6, RF_NO_CAL);
   }
   
