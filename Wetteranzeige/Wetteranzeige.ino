@@ -18,7 +18,7 @@
 Wave29Display display;
 
 unsigned long systemSleepSeconds = 180; // including the awaked time
-unsigned long systemAwakeSeconds = 10;
+unsigned long systemAwakeSeconds = 12;
 
 #include "TH.h"
 #include "WeatherServer.h"
@@ -29,6 +29,7 @@ Adafruit_BME280 bme(0);
 bool bme_ok = false;
 
 bool determineLocalTemperature = true;
+bool startedWithPattern = false;
 bool displayUpdated = false;
 unsigned long systemStart = 0;
 
@@ -89,6 +90,7 @@ void setup()
     display.fillScreen(0x36); // a line pattern
     display.update();
     display.initPartialMode();
+    startedWithPattern = true;
   } else {
     display.initPartialMode();
     display.fillScreen(EPD_WHITE);
@@ -130,6 +132,12 @@ void loop()
         localData.humidity = round(h * 5) / 5.0f;
 
         updateVaporPressure(&localData);
+
+        if (startedWithPattern) {
+          // Show something at the very first start
+          TH invalidData;
+          updateDisplay(&localData, &invalidData);
+        }
       } else {
         localData.dataValid = false;
       }
@@ -140,8 +148,8 @@ void loop()
 
   unsigned long systemActive = millis() - systemStart;
   unsigned int secondsUntilOff = 0;
-  if (10*1000 > systemActive)
-    secondsUntilOff = (10*1000 - systemActive) / 1000;
+  if ((systemAwakeSeconds - 2)*1000 > systemActive) // -2 lie a little bit here; more time to connect
+    secondsUntilOff = ((systemAwakeSeconds - 2)*1000 - systemActive) / 1000;
 
   TH externalData;
   bool dataReceived = server.receiveData(&externalData, secondsUntilOff);
@@ -211,8 +219,8 @@ void loop()
       sleepMillis = systemSleepSeconds * 1000 - systemActive;
     
     Serial.print("Sleeping ");
-    if (shouldSleepNow)
-      Serial.print(" in vain ");
+    if (shouldSleepNow && !sleepNow)
+      Serial.print("in vain ");
     Serial.println(sleepMillis);
 
     DisplayStateWrapper *displayState = display.getState();
