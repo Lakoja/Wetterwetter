@@ -57,7 +57,8 @@ void setup() {
   } else {
     bme_ok = true;
   }
-  
+
+  // TODO get rid of dummy values
   randomSeed(analogRead(A0));
   float t = 49.7 + random(7);
   float h = 76.5 - random(5);
@@ -68,22 +69,17 @@ void setup() {
     h = bme.readHumidity();
 
     if (isnan(t) || isnan(h)) {
-      delay(50);
+      delay(100);
       t = bme.readTemperature() - 1;
       h = bme.readHumidity();
 
       if (isnan(t) || isnan(h)) {
         Serial.println("Ooop Cannot get meaningful values..Sleeping");
+
+        // Sleep only light (see below commented)?
         ESP.deepSleep(3e6);
       }
     }
-
-    /*
-    Serial.print("T ");
-    Serial.print(t);
-    Serial.print(" H ");
-    Serial.println(h);
-    */
     
     //*
     if (systemState.roundsWithoutTransmission < 5) {
@@ -125,20 +121,7 @@ void setup() {
   while (WiFi.status() != WL_CONNECTED) {
     unsigned long now = millis();
     if (now - connectStart > 5000) {
-      unsigned long sleepMillis = 5000;
-      systemState.connectMillisCumulated += now - systemStart;
-
-      if (systemState.connectMillisCumulated >= connectInvainThreshold) {
-        systemState.connectMillisCumulated = 0;
-        sleepMillis = 45 * 60 * 1000L; // sleep long
-      }
-      
-      systemState.writeToRtc(0, sizeof(SystemState));
-
-      Serial.print("Waiting ");
-      Serial.println(sleepMillis);
-      
-      ESP.deepSleep(sleepMillis * 1000, RF_NO_CAL); // NOTE this must be taken plus the wait time above
+      sleepNowForFailedConnect(5000L, now - systemStart);
 
       /*
       // This has 15mA instead of 70mA (above) or 1mA with deep sleep
@@ -150,8 +133,6 @@ void setup() {
       connectStart = millis();
       WiFi.begin("Wettergunde", "3ApCo_rtz_ppopp");
       */
-      
-      // TODO differentiate between successful and unsuccessful sleep time
     }
     
     delay(200);
@@ -159,16 +140,16 @@ void setup() {
   }
   Serial.println(millis()-systemStart);
 
-  systemState.connectMillisCumulated = 0;
-  // TODO write
-
   WiFiClient client;
   if (!client.connect(IPAddress(192,168,122,1), 80)) {
-    Serial.println("Server connect failed.. Sleeping");
+    Serial.print("Server connect failed.. ");
 
-    // TODO consider invain threshold
-    ESP.deepSleep(14e6, RF_NO_CAL);
+    // TODO this the right sleep time for this case?
+    sleepNowForFailedConnect(14000L, millis() - systemStart);
   }
+
+  systemState.connectMillisCumulated = 0;
+  systemState.writeToRtc(0, sizeof(SystemState));
   
   // NOTE/ TODO system start time must also be taken into account
   unsigned long connectionTime = millis();
@@ -259,6 +240,23 @@ void setup() {
 
 void loop() {
 
+}
+
+void sleepNowForFailedConnect(unsigned long sleepMillis, unsigned long millisSinceSystemStart)
+{
+  systemState.connectMillisCumulated += millisSinceSystemStart;
+
+  if (systemState.connectMillisCumulated >= connectInvainThreshold) {
+    systemState.connectMillisCumulated = 0;
+    sleepMillis = 45 * 60 * 1000L; // sleep long
+  }
+  
+  systemState.writeToRtc(0, sizeof(SystemState));
+
+  Serial.print("Waiting ");
+  Serial.println(sleepMillis);
+  
+  ESP.deepSleep(sleepMillis * 1000, RF_NO_CAL); // NOTE this must be taken plus the wait time above
 }
 
 void sleepNowForServer(short serverSecondsUntilOff, unsigned long systemOnMillis)
