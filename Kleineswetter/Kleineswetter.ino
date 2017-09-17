@@ -35,6 +35,7 @@ SystemState systemState;
 
 unsigned long connectInvainThreshold = 8 * 60 * 1000L; // some minutes
 unsigned int connectTryThreshold = 7000;
+unsigned int shiftStartSeconds = 6;
 
 void setup() {
   unsigned long systemStart = millis();
@@ -187,7 +188,7 @@ void setup() {
       serverSecondsUntilOff = greeting.substring(idx+1).toInt();
 
         Serial.print("Moving sleep time by ");
-        Serial.println(serverSecondsUntilOff - 8);
+        Serial.println(serverSecondsUntilOff - shiftStartSeconds);
     }
 
     if (systemState.serverSleepSeconds < 0 || systemState.serverSleepSeconds > 600) {
@@ -265,7 +266,7 @@ void sleepNowForServer(short serverSecondsUntilOff, unsigned long systemOnMillis
   unsigned long sleepMillis = 1;
   unsigned long correctionMillis = systemOnMillis;
   if (serverSecondsUntilOff >= 0)
-    correctionMillis += (8 - serverSecondsUntilOff) * 1000; // shift wake up time to the start of the window
+    correctionMillis += (shiftStartSeconds - serverSecondsUntilOff) * 1000; // shift wake up time to the start of the window
     
   if (systemState.serverSleepSeconds*1000 > correctionMillis) {
     sleepMillis = systemState.serverSleepSeconds * 1000 - correctionMillis;
