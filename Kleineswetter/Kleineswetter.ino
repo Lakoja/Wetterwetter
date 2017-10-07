@@ -35,7 +35,7 @@ SystemState systemState;
 
 unsigned long connectInvainThreshold = 8 * 60 * 1000L; // some minutes
 unsigned int connectTryThreshold = 7000;
-unsigned int shiftStartSeconds = 6;
+int shiftStartSeconds = 6;
 
 void setup() {
   unsigned long systemStart = millis();
@@ -94,6 +94,11 @@ void setup() {
       if (abs(systemState.lastTransmittedTemperatature - t) <= 0.5 
         && abs(vaporPressureLast - vaporPressureNow) <= 0.5) {
 
+        Serial.print("T: ");
+        Serial.print(t);
+        Serial.print(" VP ");
+        Serial.print(vaporPressureNow);
+        Serial.print(" ");
         Serial.print("Do not connect. No change. Time passed since on ");
         Serial.println(millis() - systemStart);
     
@@ -264,12 +269,20 @@ void sleepNowForFailedConnect(unsigned long sleepMillis, unsigned long millisSin
 void sleepNowForServer(short serverSecondsUntilOff, unsigned long systemOnMillis)
 {
   unsigned long sleepMillis = 1;
-  unsigned long correctionMillis = systemOnMillis;
+  long correctionMillis = systemOnMillis;
   if (serverSecondsUntilOff >= 0)
     correctionMillis += (shiftStartSeconds - serverSecondsUntilOff) * 1000; // shift wake up time to the start of the window
     
   if (systemState.serverSleepSeconds*1000 > correctionMillis) {
     sleepMillis = systemState.serverSleepSeconds * 1000 - correctionMillis;
+  } else {
+    Serial.print("Do not adapt sleep millis ");
+    Serial.print(systemState.serverSleepSeconds*1000);
+    Serial.print(" ");
+    Serial.print(correctionMillis);
+    Serial.print(" ");
+    Serial.print(serverSecondsUntilOff);
+    Serial.print(" ");
   }
   Serial.print("Sleeping ");
   Serial.println(sleepMillis);
