@@ -35,7 +35,7 @@ SystemState systemState;
 
 unsigned long connectInvainThreshold = 8 * 60 * 1000L; // some minutes
 unsigned int connectTryThreshold = 7000;
-unsigned int shiftStartSeconds = 6;
+int shiftStartSeconds = 6;
 
 void setup() {
   unsigned long systemStart = millis();
