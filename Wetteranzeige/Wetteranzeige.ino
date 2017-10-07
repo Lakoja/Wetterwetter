@@ -17,8 +17,8 @@
 #include "Wave29Display.h"
 Wave29Display display;
 
-unsigned long systemSleepSeconds = 180; // including the awaked time
-unsigned long systemAwakeSeconds = 12;
+unsigned long systemSleepSeconds = 240; // including the awaked time
+unsigned long systemAwakeSeconds = 14;
 
 #include "TH.h"
 #include "WeatherServer.h"
@@ -148,8 +148,8 @@ void loop()
 
   unsigned long systemActive = millis() - systemStart;
   unsigned int secondsUntilOff = 0;
-  if ((systemAwakeSeconds - 2)*1000 > systemActive) // -2 lie a little bit here; more time to connect
-    secondsUntilOff = ((systemAwakeSeconds - 2)*1000 - systemActive) / 1000;
+  if ((systemAwakeSeconds - 3)*1000 > systemActive) // -3 lie a little bit here; more time to connect
+    secondsUntilOff = ((systemAwakeSeconds - 3)*1000 - systemActive) / 1000;
 
   TH externalData;
   bool dataReceived = server.receiveData(&externalData, secondsUntilOff);
@@ -218,8 +218,11 @@ void loop()
     unsigned long sleepMillis = 1;
     if (systemSleepSeconds * 1000 > systemActive)
       sleepMillis = systemSleepSeconds * 1000 - systemActive;
+
+    systemState.accumulatedSystemMillis = systemState.accumulatedSystemMillis + systemActive + sleepMillis;
+    Serial.print(systemState.accumulatedSystemMillis / (1000 * 60));
     
-    Serial.print("Sleeping ");
+    Serial.print("m Sleeping ");
     if (shouldSleepNow && !sleepNow)
       Serial.print("in vain ");
     Serial.println(sleepMillis);
@@ -227,7 +230,6 @@ void loop()
     DisplayStateWrapper *displayState = display.getState();
     displayState->writeToRtc(1, sizeof(DisplayStateWrapper));
 
-    systemState.accumulatedSystemMillis = systemState.accumulatedSystemMillis + systemActive + sleepMillis;
     systemState.writeToRtc(0, sizeof(SystemState));
     
     ESP.deepSleep(sleepMillis * 1000);
