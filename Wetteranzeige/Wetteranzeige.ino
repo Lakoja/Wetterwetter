@@ -210,7 +210,8 @@ void loop()
   }
 
   unsigned long loopEnd = millis();
-  
+
+  // TODO also use a time threshold for update need
   if (sleepNow || shouldSleepNow) {
     unsigned long systemActive = loopEnd - systemStart;
     
