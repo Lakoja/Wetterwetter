@@ -69,61 +69,75 @@ public:
     drawRect(x+2, y+2, w-4, h-4, EPD_BLACK);
 
     if (th->dataValid) {
-      // NOTE / TODO the fonts are modified for the . and : to use less width
+      // NOTE / TODO the fonts are modified for the . and : and space to use less width
       
       setFont(&FreeMonoBold18pt7b);
       setTextColor(EPD_BLACK);
 
+      setCursor(x, y + 30);
+
+      /*
       if (th->temperature < 0) {
         // the minus sign
-        drawRect(x + 2, y + 18, 10, 4, EPD_BLACK);
+        fillRect(x + 5, y + 20, 10, 4, EPD_BLACK);
       }
-      
-      setCursor(x + 18, y + 30);
-
-      //dtostrf(th->temperature, 4, 1, formatted);
-
       printFloat(abs(th->temperature));
-      println('c');
+      */
       
+      static char formatted[10];
+      dtostrf(th->temperature, 5, 1, formatted);
+
+      print(formatted);
+      println('c');
+
+      setCursor(x + 20, y + 64);
       printFloat(th->vaporPressure);
       println("p");
       
       setFont(&FreeMonoBold12pt7b);
-      setCursor(x + 54, y + 96);
+      setCursor(x + 56, y + 96);
       printFloat(th->humidity);
       println('%');
     }
 
     setFont(&FreeMonoBold9pt7b);
-    setCursor(x + 23, y + 120);
+    setCursor(x + 7, y + 120);
+    
+    print("v ");
+    printFloat(th->volts + 0.05, 1); // + 0.05 = round
+    print(" ");
+    
     printTime(millisDiff);
   }
 
-  void printFloat(float f)
+  void printFloat(float f, uint8_t decimals = 2)
   {
-      static char formatted[12];
-      
-      sprintf(formatted, "%2d", (int)f);
-      print(formatted);
-      print('.');
-      sprintf(formatted, "%1d", (int)(10*f) % 10);
-      print(formatted);
+    static char formatter[6];
+    sprintf(formatter, "%%%dd", decimals);
+    static char formatted[12];
+    
+    sprintf(formatted, formatter, (int)f);
+    print(formatted);
+    print('.');
+    sprintf(formatted, "%1d", (int)(10*f) % 10);
+    print(formatted);
   }
 
   void printTime(unsigned long milli)
   {
-    static char timeFormatted[12];
+    static char timeFormatted[10];
 
     long seconds = milli / 1000;
     int h = seconds / 3600;
     int m = (seconds / 60) % 60;
     int s = seconds % 60;
 
-    if (h != 0)
-      sprintf(timeFormatted, "h %4d:%02d", h, m);
+    if (h > 9)
+      sprintf(timeFormatted, "h %4d", h);
+    else if (h != 0)
+      sprintf(timeFormatted, "h %1d:%02d", h, m);
     else
-      sprintf(timeFormatted, "m %4d:%02d", m, s);
+      sprintf(timeFormatted, "m%2d:%02d", m, s);
     print(timeFormatted);
   }
 };
