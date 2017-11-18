@@ -26,14 +26,6 @@ WeatherServer server(systemSleepSeconds);
 
 #include <Adafruit_BME280.h>
 Adafruit_BME280 bme(0);
-bool bme_ok = false;
-
-bool determineLocalTemperature = true;
-bool startedWithPattern = false;
-bool displayUpdated = false;
-unsigned long systemStart = 0;
-
-uint8_t cyclesWithoutUpdateThreshold = 5;
 
 #include "CrcableData.h"
 
@@ -52,6 +44,15 @@ public:
 SystemState systemState;
 TH localData;
 
+bool bme_ok = false; // TODO superfluous
+
+bool determineLocalTemperature = true; // TODO superfluous
+bool startedWithPattern = false; // TODO superfluous
+bool displayUpdated = false;
+unsigned long systemStart = 0;
+
+uint8_t cyclesWithoutUpdateThreshold = 5;
+
 //ADC_MODE(ADC_VCC);
 
 void setup()
@@ -61,14 +62,20 @@ void setup()
   Serial.begin(115200);
   Serial.println(" Setup"); // Most importantly: move to a new line after boot message
 
-/*
-  Serial.print("Chip id ");
-  Serial.print(ESP.getChipId());
-  Serial.print(" Flash size ");
-  Serial.print(ESP.getFlashChipRealSize());
-  Serial.print(" Vcc ");
-  Serial.println(ESP.getVcc());
-  */
+  float volts = analogRead(A0) / 1023.0;
+  float realVolts = volts * 4.975; // measured for 300k and 82k bridge; is somewhat tweaked...
+
+  // TODO something to be done in the client; not trying to connect?
+  
+  if (realVolts < 3.2) {
+    Serial.print("Do not start with too low battery: ");
+    Serial.println(realVolts);
+
+    ESP.deepSleep(45*60 * 1000000L); // sleep 45 minutes
+  } else {
+    Serial.print("Voltage: ");
+    Serial.println(realVolts);
+  }
   
   DisplayStateWrapper displayState;
   bool displayStateValid = displayState.readFromRtc(1, sizeof(DisplayStateWrapper));
@@ -81,6 +88,51 @@ void setup()
     systemState = systemStateFromRtc;
   }
 
+  if (!bme.begin()) {
+    Serial.println("No BME!");
+  } else {
+    bme_ok = true;
+    delay(100); // Allow things to settle after begin()
+
+    if (determineLocalTemperature) {
+      determineLocalTemperature = false;
+  
+      localData.dataValid = false;
+      
+      if (bme_ok) {
+        float t = bme.readTemperature() - 1;
+        float h = bme.readHumidity();
+  
+        if (isnan(t) || isnan(h)) {
+          Serial.println("First local temp read was invalid");
+          delay(100);
+          t = bme.readTemperature() - 1;
+          h = bme.readHumidity();
+        }
+  
+        Serial.println(t);
+  
+        bme.setSampling(Adafruit_BME280::MODE_FORCED); // power down
+     
+        if (!isnan(t) && !isnan(h) && t > -100 && t < 100) {
+          localData.dataValid = true;
+          localData.temperature = round(t * 5) / 5.0f;
+          localData.humidity = round(h * 5) / 5.0f;
+  
+          updateVaporPressure(&localData);
+        } else {
+          localData.dataValid = false;
+        }
+      }
+    }
+  
+    // TODO blank values if not up to date (> 5 minutes?)
+  }
+  
+  //displayStateValid = false;
+
+  // TODO / NOTE this will destroy communication with BME; thus temperature is alreay and finally read above
+  
   display.initWave29(displayStateValid ? &displayState : NULL);
   display.setRotation(1);
 
@@ -89,62 +141,41 @@ void setup()
     display.initFullMode();
     display.fillScreen(0x36); // a line pattern
     display.update();
+  
     display.initPartialMode();
+
+    display.fillScreen(0x1e); // a line pattern
+    display.update();
+    
     startedWithPattern = true;
+
+    if (startedWithPattern) {
+      // Show something at the very first start
+      TH invalidData;
+      updateDisplay(&localData, &invalidData);
+    }
   } else {
     display.initPartialMode();
     display.fillScreen(EPD_WHITE);
   }
 
   server.begin();
-  
-  if (!bme.begin()) {
-    Serial.println("No BME!");
-  } else {
-    bme_ok = true;
-    delay(100); // Allow things to settle after begin()
-  }
+
+
+  /*
+    TH local;
+    local.dataValid = true;
+    local.temperature = 23.0;
+    local.humidity = 75.0;
+    local.vaporPressure = 12.1;
+    display.displayValues(&local, 1, 0);
+    display.update();
+    */
 }
 
 void loop()
 {
   unsigned long loopStart = millis();
-  
-  if (determineLocalTemperature) {
-    determineLocalTemperature = false;
-
-    localData.dataValid = false;
-    
-    if (bme_ok) {
-      float t = bme.readTemperature() - 1;
-      float h = bme.readHumidity();
-
-      if (isnan(t) || isnan(h)) {
-        Serial.println("First local temp read was invalid");
-        delay(100);
-        t = bme.readTemperature() - 1;
-        h = bme.readHumidity();
-      }
-   
-      if (!isnan(t) && !isnan(h) && t > -100 && t < 100) {
-        localData.dataValid = true;
-        localData.temperature = round(t * 5) / 5.0f;
-        localData.humidity = round(h * 5) / 5.0f;
-
-        updateVaporPressure(&localData);
-
-        if (startedWithPattern) {
-          // Show something at the very first start
-          TH invalidData;
-          updateDisplay(&localData, &invalidData);
-        }
-      } else {
-        localData.dataValid = false;
-      }
-    }
-  }
-
-  // TODO blank values if not up to date (> 5 minutes?)
 
   unsigned long systemActive = millis() - systemStart;
   unsigned int secondsUntilOff = 0;
@@ -170,6 +201,8 @@ void loop()
   bool shouldSleepNow = millis() - systemStart > systemAwakeSeconds * 1000;
 
   if (shouldSleepNow && !displayUpdated) {
+    boolean internalIsToBeShown = true;
+    /*
     boolean internalIsToBeShown = systemState.displayedInternalTemperature == -100;
 
     if (!internalIsToBeShown) {
@@ -193,7 +226,7 @@ void loop()
           // NOTE the "update at least every X tries" is handled indirectly by the external source
         }
       }
-    }
+    }*/
 
     if (internalIsToBeShown) {
       if (systemState.externalDataValid) {
