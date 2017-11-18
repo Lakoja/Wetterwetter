@@ -83,7 +83,8 @@ public:
       //Serial.print("u");
       Serial.print("Got data ");
       Serial.print(data);
-      Serial.println('_');
+      Serial.print('_ off-');
+      Serial.println((int)(secondsUntilOff)*1000 - (millis() - clientWaitStart));
 
 
       // TODO this takes timeout long (5s)
@@ -93,11 +94,25 @@ public:
       // client.stop();
   
       if (data.length() > 0) {
-        int idx = data.indexOf(' ');
+        int idx1 = data.indexOf(' ');
   
-        if (idx > 0) {
-          float t = data.substring(0, idx).toFloat();
-          float h = data.substring(idx+1).toFloat();
+        if (idx1 > 0) {
+          float t = data.substring(0, idx1).toFloat();
+
+          float h = 0;
+          float v = 0;
+          
+          int idx2 = data.indexOf(' ', idx1 + 1);
+          if (idx2 > 0) {
+            h = data.substring(idx1+1, idx2).toFloat();
+            v = data.substring(idx2+1).toFloat();
+
+            Serial.print("Got voltage ");
+            Serial.println(v);
+            
+          } else {
+            h = data.substring(idx1+1).toFloat();
+          }
 
           if (isnan(t) || isnan(h)) {
             Serial.println("Discarding bogus data");
