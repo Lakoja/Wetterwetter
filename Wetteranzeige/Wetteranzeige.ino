@@ -101,13 +101,13 @@ void setup()
       localData.dataValid = false;
       
       if (bme_ok) {
-        float t = bme.readTemperature() - 1;
+        float t = bme.readTemperature() - 0.5;
         float h = bme.readHumidity();
   
         if (isnan(t) || isnan(h)) {
           Serial.println("First local temp read was invalid");
           delay(100);
-          t = bme.readTemperature() - 1;
+          t = bme.readTemperature() - 0.5;
           h = bme.readHumidity();
         }
   

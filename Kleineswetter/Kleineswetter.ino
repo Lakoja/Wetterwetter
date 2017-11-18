@@ -78,12 +78,12 @@ void setup() {
   if (bme_ok) {
     // delay(250); // only for i2c
     
-    t = bme.readTemperature() - 1;
+    t = bme.readTemperature() - 0.5;
     h = bme.readHumidity();
 
     if (isnan(t) || isnan(h)) {
       delay(100);
-      t = bme.readTemperature() - 1;
+      t = bme.readTemperature() - 0.5;
       h = bme.readHumidity();
 
       if (isnan(t) || isnan(h)) {
