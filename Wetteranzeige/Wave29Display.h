@@ -34,8 +34,6 @@ class Wave29Display : public EpdDisplay
 {
 private:
   DisplayStateWrapper state;
-  
-  uint16_t blockHeight = 124;
 
 public:
   Wave29Display(bool operateAsync = false) :  
@@ -56,17 +54,18 @@ public:
 
   void displayValues(TH *th, uint8_t whichBlock, unsigned long millisDiff)
   {
-    int16_t x = 0, y = 0, w = width(), h = blockHeight;
+    uint16_t blockSize = min(WIDTH, HEIGHT);
+    int16_t x = 0, y = 0, w = blockSize, h = blockSize;
     if (2 == whichBlock) {
-      y = blockHeight;
+      // blocks on top of each other
+      y = blockSize;
     }
     
-    if (1 == getRotation()) {
+    if (1 == getRotation() || 3 == getRotation()) {
+      // blocks next to each other
       swap(x, y);
-      swap(w, h);
     }
 
-    fillRect(x, y, w, h, EPD_WHITE);
     drawRect(x+2, y+2, w-4, h-4, EPD_BLACK);
 
     if (th->dataValid) {
@@ -74,12 +73,17 @@ public:
       
       setFont(&FreeMonoBold18pt7b);
       setTextColor(EPD_BLACK);
+
+      if (th->temperature < 0) {
+        // the minus sign
+        drawRect(x + 2, y + 18, 10, 4, EPD_BLACK);
+      }
       
       setCursor(x + 18, y + 30);
 
       //dtostrf(th->temperature, 4, 1, formatted);
 
-      printFloat(th->temperature);
+      printFloat(abs(th->temperature));
       println('c');
       
       printFloat(th->vaporPressure);
@@ -92,7 +96,7 @@ public:
     }
 
     setFont(&FreeMonoBold9pt7b);
-    setCursor(x + 23, y + 122);
+    setCursor(x + 23, y + 120);
     printTime(millisDiff);
   }
 
