@@ -19,7 +19,7 @@
 #include <ESP8266WiFi.h>
 #include "CrcableData.h"
 
-Adafruit_BME280 bme;
+Adafruit_BME280 bme(0);
 bool bme_ok = false;
 
 class SystemState : public CrcableData {
@@ -43,6 +43,17 @@ void setup() {
   Serial.begin(115200);
   Serial.println("Beginning"); // More importantly: move cursor to the beginning of the line
 
+  float volts = analogRead(A0) / 1023.0;
+  float realVolts = volts * 4.975; // measured for 300k and 82k bridge; is somewhat tweaked...
+
+  if (realVolts < 3.2) {
+    Serial.print("Do not start with too low battery: ");
+    Serial.print(realVolts);
+    Serial.println();
+
+    ESP.deepSleep(45*60 * 1000000L); // sleep 45 minutes
+  }
+
   SystemState systemStateFromRtc;
   bool systemStateValid = systemStateFromRtc.readFromRtc(0, sizeof(SystemState));
   if (!systemStateValid) {
@@ -51,7 +62,7 @@ void setup() {
     systemState = systemStateFromRtc;
   }
 
-  if (!bme.begin(0x76)) {
+  if (!bme.begin()) { // i2c address here would be 0x76
     Serial.println("Could not start BME280.");
     ESP.deepSleep(6e6);
 
@@ -61,12 +72,12 @@ void setup() {
   }
 
   // TODO get rid of dummy values
-  randomSeed(analogRead(A0));
-  float t = 49.7 + random(7);
-  float h = 76.5 - random(5);
+  float t = 49.7;
+  float h = 76.5;
 
   if (bme_ok) {
-    delay(250);
+    // delay(250); // only for i2c
+    
     t = bme.readTemperature() - 1;
     h = bme.readHumidity();
 
@@ -82,6 +93,8 @@ void setup() {
         ESP.deepSleep(3e6);
       }
     }
+
+    bme.setSampling(Adafruit_BME280::MODE_FORCED); // power off
     
     //*
     if (systemState.roundsWithoutTransmission < 5) {
@@ -207,10 +220,13 @@ void setup() {
 
   static char numBuffer1[10];
   static char numBuffer2[10];
+  static char numBuffer3[10];
   dtostrf(t, 4, 2, numBuffer1);
   dtostrf(h, 4, 2, numBuffer2);
-  static char outBuffer[22];
-  sprintf(outBuffer, "%s %s", numBuffer1, numBuffer2);
+  dtostrf(realVolts, 4, 2, numBuffer3);
+  
+  static char outBuffer[26];
+  sprintf(outBuffer, "%s %s %s", numBuffer1, numBuffer2, numBuffer3);
 
   client.println(outBuffer);
   Serial.print("Sent ");
