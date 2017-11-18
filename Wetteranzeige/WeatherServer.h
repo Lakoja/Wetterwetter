@@ -83,9 +83,8 @@ public:
       //Serial.print("u");
       Serial.print("Got data ");
       Serial.print(data);
-      Serial.print('_ off-');
+      Serial.print("_ off-");
       Serial.println((int)(secondsUntilOff)*1000 - (millis() - clientWaitStart));
-
 
       // TODO this takes timeout long (5s)
       //client.print("OK");
@@ -106,10 +105,6 @@ public:
           if (idx2 > 0) {
             h = data.substring(idx1+1, idx2).toFloat();
             v = data.substring(idx2+1).toFloat();
-
-            Serial.print("Got voltage ");
-            Serial.println(v);
-            
           } else {
             h = data.substring(idx1+1).toFloat();
           }
@@ -124,6 +119,7 @@ public:
 
           th->temperature = t;
           th->humidity = h;
+          th->volts = v;
 
           th->dataValid = true;
           return true;

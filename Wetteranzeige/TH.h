@@ -26,6 +26,7 @@ public:
   float temperature = 0;
   float humidity = 0;
   float vaporPressure = 0;
+  float volts = 0;
 };
 #endif
 

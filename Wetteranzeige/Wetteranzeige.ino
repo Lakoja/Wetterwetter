@@ -34,9 +34,10 @@ public:
   float displayedInternalTemperature = -100;
   float displayedInternalHumidity = -100;
   uint8_t cyclesWithoutShow = 0;
-  bool externalDataValid = false;
+  bool externalDataValid = false; // TODO use TH directly?
   float lastExternalTemperature = 0;
   float lastExternalHumidity = 0;
+  float lastExternalVoltage = 0;
   unsigned long lastExternalValuesMillis = 0;
   unsigned long accumulatedSystemMillis = 0;
 };
@@ -110,18 +111,15 @@ void setup()
           h = bme.readHumidity();
         }
   
-        Serial.println(t);
-  
         bme.setSampling(Adafruit_BME280::MODE_FORCED); // power down
      
         if (!isnan(t) && !isnan(h) && t > -100 && t < 100) {
           localData.dataValid = true;
           localData.temperature = round(t * 5) / 5.0f;
           localData.humidity = round(h * 5) / 5.0f;
+          localData.volts = realVolts;
   
           updateVaporPressure(&localData);
-        } else {
-          localData.dataValid = false;
         }
       }
     }
@@ -192,6 +190,7 @@ void loop()
     systemState.externalDataValid = true;
     systemState.lastExternalTemperature = externalData.temperature;
     systemState.lastExternalHumidity = externalData.humidity;
+    systemState.lastExternalVoltage = externalData.volts;
     systemState.lastExternalValuesMillis = systemState.accumulatedSystemMillis + (millis() - systemStart);
 
     updateDisplay(&localData, &externalData);
@@ -233,6 +232,7 @@ void loop()
         externalData.dataValid = true;
         externalData.temperature = systemState.lastExternalTemperature;
         externalData.humidity = systemState.lastExternalHumidity;
+        externalData.volts = systemState.lastExternalVoltage;
         updateVaporPressure(&externalData);
       }
       
