@@ -84,7 +84,7 @@ public:
       Serial.print("Got data ");
       Serial.print(data);
       Serial.print("_ off-");
-      Serial.println((int)(secondsUntilOff)*1000 - (millis() - clientWaitStart));
+      Serial.println(((long)(secondsUntilOff))*1000 - (millis() - clientWaitStart));
 
       // TODO this takes timeout long (5s)
       //client.print("OK");
