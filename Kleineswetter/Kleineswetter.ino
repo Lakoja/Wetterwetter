@@ -33,8 +33,8 @@ public:
 
 SystemState systemState;
 
-unsigned long connectInvainThreshold = 8 * 60 * 1000L; // some minutes
-unsigned int connectTryThreshold = 7000;
+unsigned long connectInvainThreshold = 6 * 60 * 1000L; // some minutes
+unsigned int connectTryThreshold = 6000;
 int shiftStartSeconds = 6;
 
 void setup() {
@@ -277,7 +277,9 @@ void sleepNowForFailedConnect(unsigned long sleepMillis, unsigned long millisSin
   systemState.writeToRtc(0, sizeof(SystemState));
 
   Serial.print("Waiting ");
-  Serial.println(sleepMillis);
+  Serial.print(sleepMillis);
+  Serial.print(" but only for s ");
+  Serial.println((connectInvainThreshold - systemState.connectMillisCumulated) / 1000);
   
   ESP.deepSleep(sleepMillis * 1000, RF_NO_CAL); // NOTE this must be taken plus the wait time above
 }
