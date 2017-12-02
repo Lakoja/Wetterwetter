@@ -146,6 +146,7 @@ void setup()
     display.update();
     
     startedWithPattern = true;
+    display.fillScreen(EPD_WHITE); // clear (all following operations only overwrite)
 
     if (startedWithPattern) {
       // Show something at the very first start
@@ -154,11 +155,10 @@ void setup()
     }
   } else {
     display.initPartialMode();
-    display.fillScreen(EPD_WHITE);
+    display.fillScreen(EPD_WHITE); // clear (all following operations only overwrite)
   }
 
   server.begin();
-
 
   /*
     TH local;
