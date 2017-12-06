@@ -55,26 +55,49 @@ public:
   void displayValues(TH *th, uint8_t whichBlock, unsigned long millisDiff)
   {
     uint16_t blockSize = min(WIDTH, HEIGHT);
-    int16_t x = 0, y = 0, w = blockSize, h = blockSize;
+    // NOTE the +20 below assumes the 2.9 display with 128x296 pixels.
+    
+    int16_t startX = 0, startY = 0, w = blockSize, h = blockSize;
     if (2 == whichBlock) {
       // blocks on top of each other
-      y = blockSize;
+      startY = blockSize + 20;
     }
-    
-    if (1 == getRotation() || 3 == getRotation()) {
+
+    int8_t displayRotation = getRotation();
+    setTextColor(EPD_BLACK);
+
+    printText(startX, startY, 1 == whichBlock ? "Innen" : "Aussen");
+
+    if (th->dataValid) {
+      int16_t x = startX;
+      int16_t y = startY;
+      
+      if (1 == displayRotation || 3 == displayRotation) {
+        // blocks next to each other
+        swap(x, y);
+      } else {
+        // battery to the right of the text
+        x = WIDTH - 20;  
+      }
+      
+      showBatteryLevel(x, y, th->volts);
+    }
+
+    int16_t x = startX;
+    int16_t y = startY + 20;
+
+    if (1 == displayRotation || 3 == displayRotation) {
       // blocks next to each other
       swap(x, y);
     }
-
+    
     drawRect(x+2, y+2, w-4, h-4, EPD_BLACK);
 
     if (th->dataValid) {
       // NOTE / TODO the fonts are modified for the . and : and space to use less width
-      
-      setFont(&FreeMonoBold18pt7b);
-      setTextColor(EPD_BLACK);
 
-      setCursor(x, y + 30);
+      setFont(&FreeMonoBold18pt7b);
+      setCursor(x + 2, y + 32);
 
       /*
       if (th->temperature < 0) {
@@ -90,26 +113,63 @@ public:
       print(formatted);
       println('c');
 
-      setCursor(x + 20, y + 64);
+      setCursor(x + 22, y + 65);
       printFloat(th->vaporPressure);
       println("p");
       
       setFont(&FreeMonoBold12pt7b);
-      setCursor(x + 56, y + 96);
+      setCursor(startX + 58, startY + 96);
       printFloat(th->humidity);
       println('%');
     }
 
     setFont(&FreeMonoBold9pt7b);
-    setCursor(x + 7, y + 120);
     
+    /*
+    setCursor(x + 7, y + 120);
     print("v ");
     printFloat(th->volts + 0.05, 1); // + 0.05 = round
     print(" ");
+    */
     
+    setCursor(x + 60, y + 120);
     printTime(millisDiff);
   }
 
+  void printText(int16_t x, int16_t y, const char* text)
+  {
+    int8_t displayRotation = getRotation();
+    
+    setFont(&FreeMonoBold12pt7b);
+
+    // The texts are always written in the smaller direction
+    if (1 == displayRotation)
+      setRotation(0);
+    else if (3 == displayRotation)
+      setRotation(2);
+      
+    setCursor(x + 4, y + 20 - 2);
+    print(text);
+    
+    setRotation(displayRotation);
+  }
+
+  void showBatteryLevel(int16_t x, int16_t y, float volts)
+  {
+    int16_t batteryInnerWidth = 13;
+    int16_t batteryInnerHeight = 5;
+    
+    // assume a linear range between 3.1 and 4.1 volts
+    float batteryJuiceLeft = volts - 3.1;
+    if (batteryJuiceLeft < 0)
+      batteryJuiceLeft = 0;
+    int16_t batteryFillWidth = (int16_t)((batteryJuiceLeft / 1.0) * batteryInnerWidth + 0.5);
+
+    drawRect(x+2, y+4+1, 2, batteryInnerHeight, EPD_BLACK);
+    drawRect(x+4, y+4, batteryInnerWidth+2, batteryInnerHeight+2, EPD_BLACK);
+    fillRect(x+5+batteryInnerWidth-batteryFillWidth, y+4+1, batteryFillWidth, batteryInnerHeight, EPD_BLACK);
+  }
+  
   void printFloat(float f, uint8_t decimals = 2)
   {
     static char formatter[6];

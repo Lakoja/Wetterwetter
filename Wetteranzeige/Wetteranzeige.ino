@@ -68,7 +68,7 @@ void setup()
 
   // TODO something to be done in the client; not trying to connect?
   
-  if (realVolts < 3.2) {
+  if (realVolts < 3.1) {
     Serial.print("Do not start with too low battery: ");
     Serial.println(realVolts);
 
