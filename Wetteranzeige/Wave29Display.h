@@ -118,7 +118,7 @@ public:
       println("p");
       
       setFont(&FreeMonoBold12pt7b);
-      setCursor(startX + 58, startY + 96);
+      setCursor(x + 58, y + 96);
       printFloat(th->humidity);
       println('%');
     }
