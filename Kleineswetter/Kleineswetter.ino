@@ -33,9 +33,10 @@ public:
 
 SystemState systemState;
 
-unsigned long connectInvainThreshold = 6 * 60 * 1000L; // some minutes
+unsigned long connectInvainThreshold = 5 * 60 * 1000L; // some minutes
 unsigned int connectTryThreshold = 6000;
 int shiftStartSeconds = 6;
+int withoutTransmissionRoundsThreshold = 2;
 
 void setup() {
   unsigned long systemStart = millis();
@@ -46,7 +47,7 @@ void setup() {
   float volts = analogRead(A0) / 1023.0;
   float realVolts = volts * 4.975; // measured for 300k and 82k bridge; is somewhat tweaked...
 
-  if (realVolts < 3.2) {
+  if (realVolts < 3.1) {
     Serial.print("Do not start with too low battery: ");
     Serial.print(realVolts);
     Serial.println();
@@ -97,7 +98,7 @@ void setup() {
     bme.setSampling(Adafruit_BME280::MODE_FORCED); // power off
     
     //*
-    if (systemState.roundsWithoutTransmission < 5) {
+    if (systemState.roundsWithoutTransmission < withoutTransmissionRoundsThreshold) {
       float vaporPressureLast = -100;
       if (systemState.lastTransmittedHumidity > 0) {
         vaporPressureLast = getVaporPressure(systemState.lastTransmittedTemperatature, systemState.lastTransmittedHumidity);
@@ -141,7 +142,7 @@ void setup() {
   while (WiFi.status() != WL_CONNECTED) {
     unsigned long now = millis();
     if (now - connectStart > connectTryThreshold) {
-      sleepNowForFailedConnect(5000L, now - systemStart);
+      sleepNowForFailedConnect(connectTryThreshold, now - systemStart);
 
       /*
       // This has 15mA instead of 70mA (above) or 1mA with deep sleep
@@ -205,8 +206,8 @@ void setup() {
       systemState.serverSleepSeconds = greeting.substring(2, idx).toInt();
       serverSecondsUntilOff = greeting.substring(idx+1).toInt();
 
-        Serial.print("Moving sleep time by ");
-        Serial.println(serverSecondsUntilOff - shiftStartSeconds);
+      Serial.print("Moving sleep time by ");
+      Serial.println(serverSecondsUntilOff - shiftStartSeconds);
     }
 
     if (systemState.serverSleepSeconds < 0 || systemState.serverSleepSeconds > 600) {
@@ -290,6 +291,8 @@ void sleepNowForServer(short serverSecondsUntilOff, unsigned long systemOnMillis
   long correctionMillis = systemOnMillis;
   if (serverSecondsUntilOff >= 0)
     correctionMillis += (shiftStartSeconds - serverSecondsUntilOff) * 1000; // shift wake up time to the start of the window
+  else
+    correctionMillis += shiftStartSeconds*1000L - 2000;
     
   if (systemState.serverSleepSeconds*1000 > correctionMillis) {
     sleepMillis = systemState.serverSleepSeconds * 1000 - correctionMillis;
